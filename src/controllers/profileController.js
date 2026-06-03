@@ -1,10 +1,16 @@
-const { pool } = require('../config/db');
-const { fetchUserProfile, fetchUserRepos, analyzeRepos } = require('../services/githubService');
+const { pool } = require("../config/db");
+const {
+  fetchUserProfile,
+  fetchUserRepos,
+  analyzeRepos,
+} = require("../services/githubService");
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 const parseTopLanguages = (row) => {
-  if (row && typeof row.top_languages === 'string') {
-    try { row.top_languages = JSON.parse(row.top_languages); } catch (_) {}
+  if (row && typeof row.top_languages === "string") {
+    try {
+      row.top_languages = JSON.parse(row.top_languages);
+    } catch (_) {}
   }
   return row;
 };
@@ -13,8 +19,13 @@ const parseTopLanguages = (row) => {
 const analyzeProfile = async (req, res) => {
   const { username } = req.body;
 
-  if (!username || typeof username !== 'string' || !username.trim()) {
-    return res.status(400).json({ success: false, message: 'username is required in the request body' });
+  if (!username || typeof username !== "string" || !username.trim()) {
+    return res
+      .status(400)
+      .json({
+        success: false,
+        message: "username is required in the request body",
+      });
   }
 
   const cleanUsername = username.trim().toLowerCase();
@@ -26,25 +37,30 @@ const analyzeProfile = async (req, res) => {
       fetchUserRepos(cleanUsername),
     ]);
 
-    const { totalStars, totalForks, topLanguages, mostStarredRepo, mostStarredRepoStars } =
-      analyzeRepos(repos);
+    const {
+      totalStars,
+      totalForks,
+      topLanguages,
+      mostStarredRepo,
+      mostStarredRepoStars,
+    } = analyzeRepos(repos);
 
     // Account age in days
     const accountAgeDays = Math.floor(
-      (Date.now() - new Date(userProfile.created_at).getTime()) / 86_400_000
+      (Date.now() - new Date(userProfile.created_at).getTime()) / 86_400_000,
     );
 
     const values = [
       userProfile.login,
-      userProfile.name         || null,
-      userProfile.bio          || null,
+      userProfile.name || null,
+      userProfile.bio || null,
       userProfile.avatar_url,
-      userProfile.location     || null,
-      userProfile.company      || null,
-      userProfile.blog         || null,
-      userProfile.email        || null,
+      userProfile.location || null,
+      userProfile.company || null,
+      userProfile.blog || null,
+      userProfile.email || null,
       userProfile.twitter_username || null,
-      userProfile.hireable     || false,
+      userProfile.hireable || false,
       userProfile.public_repos,
       userProfile.public_gists,
       userProfile.followers,
@@ -56,8 +72,18 @@ const analyzeProfile = async (req, res) => {
       mostStarredRepoStars,
       accountAgeDays,
       userProfile.html_url,
-      userProfile.created_at,
-      userProfile.updated_at,
+      userProfile.created_at
+        ? new Date(userProfile.created_at)
+            .toISOString()
+            .slice(0, 19)
+            .replace("T", " ")
+        : null,
+      userProfile.updated_at
+        ? new Date(userProfile.updated_at)
+            .toISOString()
+            .slice(0, 19)
+            .replace("T", " ")
+        : null,
     ];
 
     // Upsert — re-analyzing an existing user refreshes all data
@@ -83,12 +109,12 @@ const analyzeProfile = async (req, res) => {
          github_created_at = VALUES(github_created_at),
          github_updated_at = VALUES(github_updated_at),
          updated_at = CURRENT_TIMESTAMP`,
-      values
+      values,
     );
 
     const [rows] = await pool.query(
-      'SELECT * FROM profiles WHERE username = ?',
-      [userProfile.login]
+      "SELECT * FROM profiles WHERE username = ?",
+      [userProfile.login],
     );
 
     return res.status(201).json({
@@ -97,8 +123,8 @@ const analyzeProfile = async (req, res) => {
       data: parseTopLanguages(rows[0]),
     });
   } catch (error) {
-    console.error('analyzeProfile error:', error.message);
-    const status = error.message.includes('not found') ? 404 : 500;
+    console.error("analyzeProfile error:", error.message);
+    const status = error.message.includes("not found") ? 404 : 500;
     return res.status(status).json({ success: false, message: error.message });
   }
 };
@@ -107,12 +133,12 @@ const analyzeProfile = async (req, res) => {
 const getAllProfiles = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT * FROM profiles ORDER BY analyzed_at DESC'
+      "SELECT * FROM profiles ORDER BY analyzed_at DESC",
     );
     rows.forEach(parseTopLanguages);
     return res.json({ success: true, count: rows.length, data: rows });
   } catch (error) {
-    console.error('getAllProfiles error:', error.message);
+    console.error("getAllProfiles error:", error.message);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -122,8 +148,8 @@ const getProfileByUsername = async (req, res) => {
   const { username } = req.params;
   try {
     const [rows] = await pool.query(
-      'SELECT * FROM profiles WHERE username = ?',
-      [username.toLowerCase()]
+      "SELECT * FROM profiles WHERE username = ?",
+      [username.toLowerCase()],
     );
 
     if (!rows.length) {
@@ -135,7 +161,7 @@ const getProfileByUsername = async (req, res) => {
 
     return res.json({ success: true, data: parseTopLanguages(rows[0]) });
   } catch (error) {
-    console.error('getProfileByUsername error:', error.message);
+    console.error("getProfileByUsername error:", error.message);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -145,19 +171,29 @@ const deleteProfile = async (req, res) => {
   const { username } = req.params;
   try {
     const [result] = await pool.query(
-      'DELETE FROM profiles WHERE username = ?',
-      [username.toLowerCase()]
+      "DELETE FROM profiles WHERE username = ?",
+      [username.toLowerCase()],
     );
 
     if (!result.affectedRows) {
-      return res.status(404).json({ success: false, message: `Profile "${username}" not found` });
+      return res
+        .status(404)
+        .json({ success: false, message: `Profile "${username}" not found` });
     }
 
-    return res.json({ success: true, message: `Profile "${username}" deleted successfully` });
+    return res.json({
+      success: true,
+      message: `Profile "${username}" deleted successfully`,
+    });
   } catch (error) {
-    console.error('deleteProfile error:', error.message);
+    console.error("deleteProfile error:", error.message);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
 
-module.exports = { analyzeProfile, getAllProfiles, getProfileByUsername, deleteProfile };
+module.exports = {
+  analyzeProfile,
+  getAllProfiles,
+  getProfileByUsername,
+  deleteProfile,
+};
